@@ -49,9 +49,7 @@ func PutDataserverHandler(ctx *macaron.Context, req models.DataServer, log *logr
 func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	data, _ := ctx.Req.Body().Bytes()
 	dataServers := []models.DataServer{}
-	json.Unmarshal(data, &dataServers)
-
-	if len(dataServers) == 0 {
+	if err := json.Unmarshal(data, &dataServers); err != nil || len(dataServers) == 0 {
 		return http.StatusBadRequest, []byte("Invalid Parameters or Incorrect json content")
 	}
 
