@@ -131,6 +131,7 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 			if err := db.KVDB.Create(&dataServer); err != nil {
 				log.Println(err.Error())
 				cached <- false
+				return
 			}
 			numCached++
 			if numCached >= numServers {
