@@ -49,9 +49,7 @@ func PutDataserverHandler(ctx *macaron.Context, req models.DataServer, log *logr
 func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	data, _ := ctx.Req.Body().Bytes()
 	dataServers := []models.DataServer{}
-	json.Unmarshal(data, &dataServers)
-
-	if len(dataServers) == 0 {
+	if err := json.Unmarshal(data, &dataServers); err != nil || len(dataServers) == 0 {
 		return http.StatusBadRequest, []byte("Invalid Parameters or Incorrect json content")
 	}
 
@@ -64,13 +62,16 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 	insertGroupServerSql := "INSERT INTO group_server (group_id, server_id) VALUES "
 
 	resultAry := []interface{}{}
-	dsToCache := []*models.DataServer{}
 
-	for _, dataServer := range dataServers {
+	for i := range dataServers {
+		dataServer := dataServers[i]
 
 		now := time.Now()
 		nowStr := now.Format("2006-01-02 15:04:05") // I don't know what the writer of Go is thinking of!
 		serverID := utils.MD5ID()
+		dataServer.ID = serverID
+		dataServer.CreateTime = now
+		dataServer.UpdateTime = now
 
 		insertDataServer := fmt.Sprintf("(%q, %q, %q, %d, %q, %q),", serverID, dataServer.GroupID, dataServer.IP, dataServer.Port, nowStr, nowStr)
 		insertGroupServer := fmt.Sprintf("(%q, %q),", dataServer.GroupID, serverID)
@@ -89,17 +90,6 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 		dsObj["data_server_id"] = serverID
 
 		resultAry = append(resultAry, dsObj)
-
-		ds := &models.DataServer{
-			ID:         serverID,
-			GroupID:    dataServer.GroupID,
-			IP:         dataServer.IP,
-			Port:       dataServer.Port,
-			CreateTime: now,
-			UpdateTime: now,
-		}
-		log.Println(ds)
-		dsToCache = append(dsToCache, ds)
 	}
 
 	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
@@ -135,12 +125,13 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 	numCached := 0
 	numServers := len(dataServers)
 	cached := make(chan bool)
-	for _, dataServer := range dsToCache {
+	for _, dataServer := range dataServers {
 		go func() {
 			// Save dataserver info to K/V Database as cache
-			if err := db.KVDB.Create(dataServer); err != nil {
+			if err := db.KVDB.Create(&dataServer); err != nil {
 				log.Println(err.Error())
 				cached <- false
+				return
 			}
 			numCached++
 			if numCached >= numServers {
