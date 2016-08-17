@@ -30,16 +30,15 @@ func PutDataserverHandler(ctx *macaron.Context, req models.DataServer, log *logr
 
 	req.ID = ds.ID
 	req.UpdateTime = time.Now()
-	log.Println(req)
 	// Save dataserver status to K/V Database
 	if err := db.KVDB.Save(&req); err != nil {
-		log.Println(err.Error())
+		log.Errorln(err.Error())
 		return http.StatusInternalServerError, []byte(err.Error())
 	}
 
 	// Save dataserver status to SQL Database
 	if err := db.SQLDB.Save(&req); err != nil {
-		log.Println(err.Error())
+		log.Errorln(err.Error())
 		return http.StatusInternalServerError, []byte(err.Error())
 	}
 
