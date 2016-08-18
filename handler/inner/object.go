@@ -10,6 +10,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"gopkg.in/macaron.v1"
 
+	"github.com/containerops/arkor/models"
 	"github.com/containerops/arkor/utils"
 	"github.com/containerops/arkor/utils/db"
 )
@@ -26,78 +27,30 @@ func AllocateFileID(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	return http.StatusOK, result
 }
 
-func PutObjectInfoHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
-	data, _ := ctx.Req.Body().Bytes()
-	fmt.Println("data= %v", data)
-	reqBody := make(map[string]interface{})
-	json.Unmarshal(data, &reqBody)
-	fragments := reqBody["fragments"].([]interface{})
-
-	if len(fragments) == 0 {
+func PutObjectInfoHandler(ctx *macaron.Context, req models.ObjectMeta, log *logrus.Logger) (int, []byte) {
+	if len(req.Fragments) == 0 {
 		return http.StatusBadRequest, []byte("Invalid Parameters")
 	}
 
+	for i := range req.Fragments {
+		req.Fragments[i].FragmentID = utils.MD5ID()
+	}
+
+	// Find the record in db
 	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
+	var objectMeta models.ObjectMeta
+	dbInstance.Where("id = ?", req.ID).First(&objectMeta)
 
-	object_id := reqBody["object_id"].(string)
-	object_key := reqBody["object_key"].(string)
-	md5_key := reqBody["md5_key"].(string)
-
-	// Remove the old relations
-	if result := dbInstance.Exec("DELETE FROM object WHERE object_id='" + object_id + "'"); result.Error != nil {
-		log.Errorln(result.Error.Error())
-		return http.StatusInternalServerError, []byte("Internal Server Error")
+	var err error
+	if &objectMeta == nil || objectMeta.ID == "" { // Create new record
+		err = db.SQLDB.Create(&req)
+	} else { // Update the objectMeta
+		err = dbInstance.Model(&objectMeta).Association("Fragments").Replace(req.Fragments).Error
 	}
 
-	// Save ObjectMeta
-	insertOrUpdateSQL := fmt.Sprintf("REPLACE INTO object_meta(id, object_key, md5_key) VALUES(%q, %q, %q)", object_id, object_key, md5_key)
-	if result := dbInstance.Exec(insertOrUpdateSQL); result.Error != nil {
-		log.Errorln(result.Error.Error())
-		return http.StatusInternalServerError, []byte("Internal Server Error")
-	}
-
-	// Save fragments and the relation
-	insertFragmentsSQL := "INSERT INTO fragment(id, `index`, start, end, group_id, file_id, is_last, mod_time) VALUES "
-	insertRelationsSQL := "REPLACE INTO object(object_id, fragment_id) VALUES "
-
-	for index := range fragments {
-		fmt.Println(fragments)
-		f := fragments[index].(map[string]interface{})
-
-		fragmentID := utils.MD5ID()
-		index := int(f["index"].(float64))
-		start := int64(f["start"].(float64))
-		end := int64(f["end"].(float64))
-		group_id := f["group_id"].(string)
-		file_id := f["file_id"].(string)
-		is_last := f["is_last"].(bool)
-
-		// modTimeStr := f["mod_time"].(string)
-		// t, err := time.Parse("2006-01-02T15:04:05Z", modTimeStr)
-		// if err != nil {
-		// 	log.Errorln(err.Error())
-		// 	return http.StatusBadRequest, []byte("Invalid Parameters")
-		// }
-		timenow := time.Now()
-		mod_time := timenow.Format("2006-01-02 15:04:05")
-
-		insertFragmentSQL := fmt.Sprintf("(%q,%d,%d,%d,%q,%q,%t,%q),", fragmentID, index, start, end, group_id, file_id, is_last, mod_time)
-		insertFragmentsSQL += insertFragmentSQL
-
-		insertRelationSQL := fmt.Sprintf("(%q,%q),", reqBody["object_id"], fragmentID)
-		insertRelationsSQL += insertRelationSQL
-	}
-
-	insertFragmentsSQL = insertFragmentsSQL[:len(insertFragmentsSQL)-1]
-	if result := db.SQLDB.GetDB().(*gorm.DB).Exec(insertFragmentsSQL); result.Error != nil {
-		log.Errorln(result.Error.Error())
-		return http.StatusInternalServerError, []byte("Internal Server Error")
-	}
-
-	insertRelationsSQL = insertRelationsSQL[:len(insertRelationsSQL)-1]
-	if result := db.SQLDB.GetDB().(*gorm.DB).Exec(insertRelationsSQL); result.Error != nil {
-		log.Errorln(result.Error.Error())
-		return http.StatusInternalServerError, []byte("Internal Server Error")
+	if err != nil {
+		log.Errorln(err.Error())
+		return http.StatusInternalServerError, nil
 	}
 
 	return http.StatusOK, nil
