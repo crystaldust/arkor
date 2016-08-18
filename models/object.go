@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/containerops/arkor/utils/db/mysql"
+	"github.com/jinzhu/gorm"
 )
 
 type ObjectMeta struct {
@@ -14,8 +15,9 @@ type ObjectMeta struct {
 }
 
 type Fragment struct {
+	gorm.Model   //
 	ObjectMetaID string
-	ID           string    `json:"id" gorm:"column:id"`
+	FragmentID   string    `json:"id" gorm:"column:fragment_id"`
 	Index        int       `json:"index" gorm:"column:index"`
 	Start        int64     `json:"start"`
 	End          int64     `json:"end"`
