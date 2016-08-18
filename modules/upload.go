@@ -44,7 +44,7 @@ func Upload(data []byte, fragInfo *models.Fragment) error {
 	h.Write(data)
 	fileID := hex.EncodeToString(h.Sum(nil))
 
-	fragInfo.ID = fileID
+	fragInfo.FragmentID = fileID
 	fragInfo.FileID = fileID
 	fragInfo.GroupID = datagroup.Servers[0].GroupID
 	log.Infoln("groupID")
@@ -67,7 +67,7 @@ func UploadData(data []byte, datagroup *models.Group, fragInfo *models.Fragment)
 	ch := make(chan string, normalCount)
 	for _, server := range datagroup.Servers {
 		if server.Status == models.RW_STATUS {
-			go concurrenceUpload(server, data, ch, fragInfo.ID)
+			go concurrenceUpload(server, data, ch, fragInfo.FragmentID)
 		}
 	}
 
