@@ -15,8 +15,8 @@ type ObjectMeta struct {
 }
 
 type Fragment struct {
-	gorm.Model   //
-	ObjectMetaID string
+	gorm.Model   `json:"-"`
+	ObjectMetaID string    `json:"-"`
 	FragmentID   string    `json:"id" gorm:"column:fragment_id"`
 	Index        int       `json:"index" gorm:"column:index"`
 	Start        int64     `json:"start"`
