@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/jinzhu/gorm"
 )
 
 // status of Data Server
@@ -13,10 +15,11 @@ const (
 
 // struct of DataServer
 type DataServer struct {
-	ID             string    `json:"data_server_id,omitempty" gorm:"unique;column:id"`
-	GroupID        string    `json:"group_id,omitempty" gorm:"column:group_id" binding:"Required"`
-	IP             string    `json:"ip,omitempty" gorm:"column:ip" binding:"Required"`
-	Port           int       `json:"port,omitempty" binding:"Required"`
+	gorm.Model     `json:"-"`
+	DataServerID   string    `json:"data_server_id,omitempty" gorm:"unique;"`
+	GroupID        string    `json:"group_id,omitempty" gorm:"unique_index:gid_ip_port" binding:"Required"`
+	IP             string    `json:"ip,omitempty" gorm:"unique_index:gid_ip_port" binding:"Required"`
+	Port           int       `json:"port,omitempty" gorm:"unique_index:gid_ip_port" binding:"Required"`
 	Status         int       `json:"status,omitempty"`
 	Deleted        int       `json:"deleted,omitempty"`
 	TotalChunks    int       `json:"total_chunks,omitempty"`
@@ -28,4 +31,8 @@ type DataServer struct {
 	ConnCounts     int       `json:"conn_counts,omitempty"`
 	CreateTime     time.Time `json:"create_time,omitempty"`
 	UpdateTime     time.Time `json:"update_time,omitempty"`
+}
+
+func (ds *DataServer) PK() string {
+	return "DataServerID"
 }
