@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -52,6 +54,91 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 		return http.StatusBadRequest, []byte("Invalid Parameters or Incorrect json content")
 	}
 
+	groupServerMap := make(map[string][]models.DataServer)
+	resultArray := []map[string]interface{}{}
+
+	for i := range dataServers {
+		dataServer := dataServers[i]
+
+		now := time.Now()
+		serverID := utils.MD5ID()
+		dataServer.DataServerID = serverID
+		dataServer.CreateTime = now
+		dataServer.UpdateTime = now
+
+		groupID := dataServer.GroupID
+		_, exists := groupServerMap[groupID]
+		if exists == true {
+			groupServerMap[groupID] = append(groupServerMap[groupID], dataServer)
+		} else {
+			groupServerMap[groupID] = []models.DataServer{dataServer}
+		}
+
+		ds := make(map[string]interface{})
+		ds["group_id"] = dataServer.GroupID
+		ds["ip"] = dataServer.IP
+		ds["port"] = dataServer.Port
+		ds["data_server_id"] = dataServer.DataServerID
+		resultArray = append(resultArray, ds)
+	}
+
+	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
+	errorOccur := make(chan error)
+
+	var wg sync.WaitGroup
+	wg.Add(len(groupServerMap))
+	for groupID, servers := range groupServerMap {
+		go func(gid string, servers []models.DataServer) {
+			defer wg.Done()
+			group := models.Group{ID: gid}
+			found, _ := db.SQLDB.Query(&group)
+			var err error
+			if found == false { // Create the group
+				err = dbInstance.Create(&models.Group{
+					ID:      gid,
+					Servers: servers,
+				}).Error
+			} else { // Append the servers to the group
+				err = dbInstance.Model(&group).Association("Servers").Append(servers).Error
+			}
+
+			if err != nil {
+				errorOccur <- err
+			}
+		}(groupID, servers)
+	}
+
+	go func() { // If everything is going ok, errorOccur won't receive any error and is closed
+		wg.Wait()
+		close(errorOccur)
+	}()
+
+	// TODO The code is vulnerable!
+	// The goroutines above may produce mutilple errors, while We currently try to handle the first one
+	// What's more, we can't skip the useless goroutine by checking if other goroutines catch errors, since
+	// the judege is too early for a database operation
+	err := <-errorOccur
+	if err != nil {
+		log.Errorln(err)
+		if strings.Contains(err.Error(), "1062") {
+			return http.StatusConflict, []byte("Data Server already registered")
+		} else {
+			return http.StatusInternalServerError, nil
+		}
+	}
+
+	result, _ := json.Marshal(resultArray)
+	ctx.Resp.Header().Set("Content-Type", "application/json")
+	return http.StatusOK, result
+}
+
+func AddDataserverHandler2(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
+	data, _ := ctx.Req.Body().Bytes()
+	dataServers := []models.DataServer{}
+	if err := json.Unmarshal(data, &dataServers); err != nil || len(dataServers) == 0 {
+		return http.StatusBadRequest, []byte("Invalid Parameters or Incorrect json content")
+	}
+
 	checkDataServerFormat := "SELECT COUNT(*) FROM data_server WHERE ip IN (%s) AND port IN (%s) AND group_id IN (%s)"
 	checkIPs := ""
 	checkPorts := ""
@@ -68,7 +155,7 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 		now := time.Now()
 		nowStr := now.Format("2006-01-02 15:04:05") // I don't know what the writer of Go is thinking of!
 		serverID := utils.MD5ID()
-		dataServer.ID = serverID
+		dataServer.DataServerID = serverID
 		dataServer.CreateTime = now
 		dataServer.UpdateTime = now
 
@@ -151,7 +238,7 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 func DeleteDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	dataserverID := ctx.Params(":dataserver")
 	ds := &models.DataServer{
-		ID: dataserverID,
+		DataServerID: dataserverID,
 	}
 
 	if err := db.KVDB.Delete(ds); err != nil {
@@ -174,7 +261,7 @@ func DeleteDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []b
 func GetDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	dataserverID := ctx.Params(":dataserver")
 	ds := &models.DataServer{
-		ID: dataserverID,
+		DataServerID: dataserverID,
 	}
 
 	exist, err := db.KVDB.Query(ds)
