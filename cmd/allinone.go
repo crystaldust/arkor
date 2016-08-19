@@ -118,22 +118,22 @@ func runAllInOne(c *cli.Context) {
 
 func InitDataServer() {
 	ds1 := models.DataServer{
-		ID:      "ALLinONEdataserver1",
-		GroupID: "2",
-		IP:      "127.0.0.1",
-		Port:    8125,
+		DataServerID: "ALLinONEdataserver1",
+		GroupID:      "2",
+		IP:           "127.0.0.1",
+		Port:         8125,
 	}
 	ds2 := models.DataServer{
-		ID:      "ALLinONEdataserver2",
-		GroupID: "2",
-		IP:      "127.0.0.1",
-		Port:    8126,
+		DataServerID: "ALLinONEdataserver2",
+		GroupID:      "2",
+		IP:           "127.0.0.1",
+		Port:         8126,
 	}
 	ds3 := models.DataServer{
-		ID:      "ALLinONEdataserver3",
-		GroupID: "2",
-		IP:      "127.0.0.1",
-		Port:    8127,
+		DataServerID: "ALLinONEdataserver3",
+		GroupID:      "2",
+		IP:           "127.0.0.1",
+		Port:         8127,
 	}
 	dataservers = append(dataservers, ds1, ds2, ds3)
 }
