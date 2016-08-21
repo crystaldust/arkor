@@ -241,18 +241,21 @@ func DeleteDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []b
 		DataServerID: dataserverID,
 	}
 
-	if err := db.KVDB.Delete(ds); err != nil {
-		return http.StatusInternalServerError, []byte(err.Error())
+	// if err := db.KVDB.Delete(ds); err != nil {
+	// 	return http.StatusInternalServerError, []byte(err.Error())
+	// }
+
+	var count int
+	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
+	dbInstance.Where(&ds).Find(&ds).Count(&count)
+
+	if count == 0 {
+		return http.StatusNotFound, []byte("Data server is NOT registered")
 	}
 
 	if err := db.SQLDB.Delete(ds); err != nil {
-		return http.StatusInternalServerError, []byte(err.Error())
-	}
-
-	whereClause := fmt.Sprintf("server_id=%q", dataserverID)
-
-	if result := db.SQLDB.GetDB().(*gorm.DB).Where(whereClause).Delete(models.GroupServer{}); result.Error != nil {
-		return http.StatusInternalServerError, []byte(result.Error.Error())
+		log.Errorln(err.Error())
+		return http.StatusInternalServerError, []byte("Internal Server Error")
 	}
 
 	return http.StatusOK, nil
