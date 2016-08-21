@@ -18,13 +18,6 @@ type Group struct {
 	Servers     []DataServer `json:"servers,omitempty"`
 }
 
-type GroupServer struct {
-	ID          int    `json:"id,omitempty" gorm:"primary_key:true;AUTO_INCREMENT"`
-	GroupStatus int    `json:"group_status,omitempty"`
-	GroupID     string `json:"group_id,omitempty"`
-	ServerID    string `json:"server_id,omitempty"`
-}
-
 /*
 A struct to receve the group-dataserver relations info in SQL
 */
