@@ -267,12 +267,12 @@ func GetDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 		DataServerID: dataserverID,
 	}
 
-	exist, err := db.KVDB.Query(ds)
-	if exist && err == nil { // Got the server from cache
-		result, _ := json.Marshal(ds)
-		ctx.Resp.Header().Set("Content-Type", "application/json")
-		return http.StatusOK, result
-	}
+	// exist, err := db.KVDB.Query(ds)
+	// if exist && err == nil { // Got the server from cache
+	// 	result, _ := json.Marshal(ds)
+	// 	ctx.Resp.Header().Set("Content-Type", "application/json")
+	// 	return http.StatusOK, result
+	// }
 
 	// If there is no info in cache, try to fetch it from SQLDB and rebuild the cache
 	if exist, err := db.SQLDB.Query(ds); !exist && err == nil {
@@ -280,7 +280,7 @@ func GetDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 	} else if err != nil {
 		return http.StatusInternalServerError, []byte(err.Error())
 	}
-	db.KVDB.Create(ds)
+	// db.KVDB.Create(ds)
 
 	ctx.Resp.Header().Set("Content-Type", "application/json")
 	result, _ := json.Marshal(ds)
