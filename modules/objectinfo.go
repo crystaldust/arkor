@@ -9,6 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
+	"github.com/containerops/arkor/errors"
 	"github.com/containerops/arkor/models"
 	"github.com/containerops/arkor/setting"
 	"github.com/containerops/arkor/utils/db"
@@ -28,6 +29,11 @@ func GetObjectInfo(objectid string) (*models.ObjectMeta, error) {
 		log.Errorln(err.Error())
 		return nil, err
 	}
+
+	if resp.StatusCode != 200 && resp.StatusCode != 304 {
+		return nil, errors.HttpStatusError{resp.StatusCode}
+	}
+
 	result, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
