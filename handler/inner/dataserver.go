@@ -61,8 +61,7 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 		dataServer := dataServers[i]
 
 		now := time.Now()
-		serverID := utils.MD5ID()
-		dataServer.DataServerID = serverID
+		dataServer.DataServerID = utils.MD5ID()
 		dataServer.CreateTime = now
 		dataServer.UpdateTime = now
 
@@ -129,109 +128,6 @@ func AddDataserverHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 
 	result, _ := json.Marshal(resultArray)
 	ctx.Resp.Header().Set("Content-Type", "application/json")
-	return http.StatusOK, result
-}
-
-func AddDataserverHandler2(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
-	data, _ := ctx.Req.Body().Bytes()
-	dataServers := []models.DataServer{}
-	if err := json.Unmarshal(data, &dataServers); err != nil || len(dataServers) == 0 {
-		return http.StatusBadRequest, []byte("Invalid Parameters or Incorrect json content")
-	}
-
-	checkDataServerFormat := "SELECT COUNT(*) FROM data_server WHERE ip IN (%s) AND port IN (%s) AND group_id IN (%s)"
-	checkIPs := ""
-	checkPorts := ""
-	checkGroupIDs := ""
-
-	insertDataServerSql := "INSERT INTO data_server (id, group_id, ip, port, create_time, update_time) VALUES "
-	insertGroupServerSql := "INSERT INTO group_server (group_id, server_id) VALUES "
-
-	resultAry := []interface{}{}
-
-	for i := range dataServers {
-		dataServer := dataServers[i]
-
-		now := time.Now()
-		nowStr := now.Format("2006-01-02 15:04:05") // I don't know what the writer of Go is thinking of!
-		serverID := utils.MD5ID()
-		dataServer.DataServerID = serverID
-		dataServer.CreateTime = now
-		dataServer.UpdateTime = now
-
-		insertDataServer := fmt.Sprintf("(%q, %q, %q, %d, %q, %q),", serverID, dataServer.GroupID, dataServer.IP, dataServer.Port, nowStr, nowStr)
-		insertGroupServer := fmt.Sprintf("(%q, %q),", dataServer.GroupID, serverID)
-
-		insertDataServerSql += insertDataServer
-		insertGroupServerSql += insertGroupServer
-
-		checkIPs += fmt.Sprintf("%q,", dataServer.IP)
-		checkPorts += fmt.Sprintf("%d,", dataServer.Port)
-		checkGroupIDs += fmt.Sprintf("%q,", dataServer.GroupID)
-
-		dsObj := make(map[string]interface{})
-		dsObj["ip"] = dataServer.IP
-		dsObj["port"] = dataServer.Port
-		dsObj["group_id"] = dataServer.GroupID
-		dsObj["data_server_id"] = serverID
-
-		resultAry = append(resultAry, dsObj)
-	}
-
-	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
-
-	checkIPs = checkIPs[:len(checkIPs)-1]
-	checkPorts = checkPorts[:len(checkPorts)-1]
-	checkGroupIDs = checkGroupIDs[:len(checkGroupIDs)-1]
-	checkExistenceSql := fmt.Sprintf(checkDataServerFormat, checkIPs, checkPorts, checkGroupIDs)
-	var cnt int
-	err := dbInstance.Raw(checkExistenceSql).Row().Scan(&cnt)
-	if err != nil {
-		return http.StatusInternalServerError, []byte("Internal server error")
-	}
-	if cnt > 0 {
-		return http.StatusConflict, []byte("Conflict (Data Server already registered)")
-	}
-
-	// Remove the last ','
-	insertDataServerSql = insertDataServerSql[:len(insertDataServerSql)-1]
-	insertGroupServerSql = insertGroupServerSql[:len(insertGroupServerSql)-1]
-
-	if result := dbInstance.Exec(insertDataServerSql); result.Error != nil {
-		log.Println(result.Error)
-		return http.StatusInternalServerError, []byte(result.Error.Error())
-	}
-
-	if result := dbInstance.Exec(insertGroupServerSql); result.Error != nil {
-		log.Println(result.Error)
-		return http.StatusInternalServerError, []byte(result.Error.Error())
-	}
-
-	// Cache the data server info
-	numCached := 0
-	numServers := len(dataServers)
-	cached := make(chan bool)
-	for _, dataServer := range dataServers {
-		go func() {
-			// Save dataserver info to K/V Database as cache
-			if err := db.KVDB.Create(&dataServer); err != nil {
-				log.Println(err.Error())
-				cached <- false
-				return
-			}
-			numCached++
-			if numCached >= numServers {
-				cached <- true
-			}
-		}()
-	}
-
-	if <-cached == false {
-		return http.StatusInternalServerError, []byte("Internal server error")
-	}
-
-	ctx.Resp.Header().Set("Content-Type", "application/json")
-	result, _ := json.Marshal(resultAry)
 	return http.StatusOK, result
 }
 
