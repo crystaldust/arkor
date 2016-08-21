@@ -11,6 +11,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"gopkg.in/macaron.v1"
 
+	"github.com/containerops/arkor/errors"
 	"github.com/containerops/arkor/models"
 	"github.com/containerops/arkor/modules"
 	"github.com/containerops/arkor/utils"
@@ -171,4 +172,25 @@ func GetObjectHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 		}
 	}
 	return http.StatusOK, outputBuf.Bytes()
+}
+
+func HeadObjectHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
+	// TODO Handle bucket info
+	// bucketName := ctx.Params(":bucket")
+	objectName := ctx.Params(":object")
+	objectMetaData, err := modules.GetObjectInfo(objectName)
+	if err != nil {
+		log.Errorln(err.Error())
+		switch err.(type) {
+		case errors.HttpStatusError:
+			return err.(errors.HttpStatusError).Status, nil
+		default:
+			return http.StatusInternalServerError, nil
+		}
+	}
+
+	ctx.Header().Set("x-arkor-request-id", utils.MD5ID())
+	ctx.Header().Set("Etag", objectMetaData.Md5Key)
+
+	return http.StatusOK, nil
 }
