@@ -2,7 +2,7 @@ package inner
 
 import (
 	"encoding/json"
-	"fmt"
+	// "fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -200,52 +200,17 @@ func GetGroupsHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 
 func GetGroupHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	groupID := ctx.Params(":group")
+	group := models.Group{
+		ID: groupID,
+	}
+
 	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
-	sqlFormat := "SELECT  * from group_server, data_server WHERE data_server.group_id=%q AND group_server.group_id=%q AND group_server.server_id = data_server.id"
-	sql := fmt.Sprintf(sqlFormat, groupID, groupID)
-
-	rows, err := dbInstance.Raw(sql).Rows()
-	if err != nil {
-		return http.StatusInternalServerError, []byte(err.Error())
-	}
-	defer rows.Close()
-
-	groupMap := make(map[string]interface{})
-	groupMap["id"] = groupID
-	groupMap["servers"] = []interface{}{}
-
-	for rows.Next() {
-		var gsInfo models.GroupServerInfo
-		dbInstance.ScanRows(rows, &gsInfo)
-
-		server := make(map[string]interface{})
-		server["data_server_id"] = gsInfo.ServerID
-		server["ip"] = gsInfo.IP
-		server["port"] = gsInfo.Port
-		server["status"] = gsInfo.Status
-		server["group_status"] = gsInfo.GroupStatus
-		server["total_chunks"] = gsInfo.TotalChunks
-		server["total_free_space"] = gsInfo.TotalFreeSpace
-		server["max_free_space"] = gsInfo.MaxFreeSpace
-		server["pending_writes"] = gsInfo.PendingWrites
-		server["data_path"] = gsInfo.DataPath
-		server["reading_count"] = gsInfo.ReadingCount
-		server["conn_counts"] = gsInfo.ConnCounts
-		server["create_time"] = gsInfo.CreateTime
-		server["update_time"] = gsInfo.UpdateTime
-		server["group_id"] = gsInfo.GroupID
-
-		servers := groupMap["servers"].([]interface{})
-		servers = append(servers, server)
-		groupMap["servers"] = servers
+	if err := dbInstance.Preload("Servers").Find(&group).Error; err != nil {
+		log.Errorln(err)
+		return http.StatusInternalServerError, []byte("Internal Server Error")
 	}
 
-	numServers := len(groupMap["servers"].([]interface{}))
-	if numServers == 0 {
-		return http.StatusNotFound, []byte("Not Found(Group not found)")
-	}
-
-	result, _ := json.Marshal(groupMap)
+	result, _ := json.Marshal(&group)
 
 	ctx.Resp.Header().Set("Content-Type", "application/json")
 	return http.StatusOK, result
