@@ -64,14 +64,20 @@ func GetObjectInfoHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte
 
 	if err := dbInstance.Where("id = ?", objectID).Preload("Fragments").First(&objectMeta).Error; err != nil {
 		log.Errorln(err.Error())
+		if err.Error() == "record not found" {
+			return http.StatusNotFound, []byte("Object NOT found")
+		}
 		return http.StatusInternalServerError, nil
 	}
 
 	result, err := json.Marshal(objectMeta)
 	if err != nil {
+
 		log.Errorln(err.Error())
 		return http.StatusInternalServerError, nil
 	}
+
+	log.Println("The query result:", objectMeta)
 
 	ctx.Resp.Header().Set("Content-Type", "application/json")
 	return http.StatusOK, result
