@@ -8,7 +8,7 @@ import (
 )
 
 type Bucket struct {
-	gorm.Model
+	gorm.Model   `json:"-"`
 	Name         string       `json:"name,omitempty" gorm:"unique"`
 	MaxKeys      string       `json:"max_keys,omitempty" gorm:"-"`
 	KeyCount     string       `json:"key_count,omitempty" gorm:"-"`
@@ -26,7 +26,6 @@ type Content struct {
 	Type         string    `json:"type"`
 	Size         int64     `json:"size"`
 	StorageClass string    `json:"storage_class"`
-	Owner        Owner     `json:"owner" gorm:"ForeignKey:ContentKey;AssociationForeignKey:Key"`
 }
 
 type BucketListResponse struct {
