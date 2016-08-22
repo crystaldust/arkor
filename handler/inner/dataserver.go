@@ -2,7 +2,6 @@ package inner
 
 import (
 	"encoding/json"
-	// "fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,8 +18,9 @@ import (
 
 func PutDataserverHandler(ctx *macaron.Context, req models.DataServer, log *logrus.Logger) (int, []byte) {
 	ds := &models.DataServer{
-		IP:   req.IP,
-		Port: req.Port,
+		IP:      req.IP,
+		Port:    req.Port,
+		GroupID: req.GroupID,
 	}
 
 	// Query DataServer ID from SQL Database
@@ -30,16 +30,26 @@ func PutDataserverHandler(ctx *macaron.Context, req models.DataServer, log *logr
 		return http.StatusInternalServerError, []byte(err.Error())
 	}
 
-	req.ID = ds.ID
+	// req.DataServerID = ds.DataServerID
 	req.UpdateTime = time.Now()
+
 	// Save dataserver status to K/V Database
-	if err := db.KVDB.Save(&req); err != nil {
-		log.Errorln(err.Error())
-		return http.StatusInternalServerError, []byte(err.Error())
-	}
+	// if err := db.KVDB.Save(&req); err != nil {
+	// 	log.Errorln(err.Error())
+	// 	return http.StatusInternalServerError, []byte(err.Error())
+	// }
 
 	// Save dataserver status to SQL Database
-	if err := db.SQLDB.Save(&req); err != nil {
+	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
+	updates := &models.DataServer{
+		TotalChunks:    req.TotalChunks,
+		TotalFreeSpace: req.TotalFreeSpace,
+		MaxFreeSpace:   req.MaxFreeSpace,
+		DataPath:       req.DataPath,
+		UpdateTime:     req.UpdateTime,
+	}
+
+	if err := dbInstance.Model(&models.DataServer{}).Updates(updates).Error; err != nil {
 		log.Errorln(err.Error())
 		return http.StatusInternalServerError, []byte(err.Error())
 	}
