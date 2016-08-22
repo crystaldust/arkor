@@ -26,9 +26,9 @@ func PutObjectHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	// Recive Object Parameters
 	objectName := ctx.Params(":object")
 	objectMetadata := models.ObjectMeta{
-		ID:     objectName,
-		Key:    objectName,
-		Md5Key: utils.MD5(objectName),
+		ObjectID: objectName,
+		Key:      objectName,
+		Md5Key:   utils.MD5(objectName),
 	}
 	objectLengthStr := ctx.Req.Header.Get("Content-Length")
 	objectLength, err := strconv.ParseInt(objectLengthStr, 10, 64)

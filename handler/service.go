@@ -18,7 +18,7 @@ func GetServiceHandler(ctx *macaron.Context, log *logrus.Logger) (int, []byte) {
 	querycondition := &models.Bucket{}
 	buckets := []models.Bucket{}
 	arkorOwner := models.Owner{
-		ID:          "arkor",
+		OwnerID:     "arkor",
 		DisplayName: "containerops-arkor",
 	}
 	if exist, err := db.SQLDB.QueryMulti(querycondition, &buckets); !exist && err == nil {
