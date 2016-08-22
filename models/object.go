@@ -8,7 +8,9 @@ import (
 )
 
 type ObjectMeta struct {
-	ID        string     `json:"object_id,omitempty" gorm:"column:id;primary_key"`
+	gorm.Model
+	Content
+	ObjectID  string     `json:"object_id,omitempty" gorm:"column:object_id"`
 	Key       string     `json:"object_key,omitempty" gorm:"column:object_key"`
 	Md5Key    string     `json:"md5_key,omitempty" gorm:"column:md5_key`
 	Fragments []Fragment `json:"fragments,omitempty" gorm:"ForeignKey:ObjectMetaID"`
