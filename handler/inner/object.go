@@ -2,7 +2,6 @@ package inner
 
 import (
 	"encoding/json"
-	// "fmt"
 	"net/http"
 	// "time"
 
@@ -39,17 +38,32 @@ func PutObjectInfoHandler(ctx *macaron.Context, req models.ObjectMeta, log *logr
 
 	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
 
-	var bucket models.Bucket
-	result := dbInstance.Where("name = ?", req.BucketName).First(&bucket)
-	if result.Error != nil {
-		// TODO If error == "record not found", shall we create the bucket or report an error
-		// log.Errorln(result.Error.Error())
-		// return http.StatusInternalServerError, []byte("Internal Server Error")
-	}
-	if result.RowsAffected == 0 {
-		dbInstance.Create(&models.Bucket{Name: req.BucketName, Objects: []models.ObjectMeta{req}})
-	} else if err := dbInstance.Model(&bucket).Association("Objects").Append(&req).Error; err != nil {
-		return http.StatusInternalServerError, []byte("Internal Server Error")
+	if req.BucketName != "" {
+		var bucket models.Bucket
+		result := dbInstance.Where("name = ?", req.BucketName).First(&bucket)
+		if result.Error != nil {
+			// TODO If error == "record not found", shall we create the bucket or report an error
+			// log.Errorln(result.Error.Error())
+			// return http.StatusInternalServerError, []byte("Internal Server Error")
+		}
+		if result.RowsAffected == 0 {
+			dbInstance.Create(&models.Bucket{Name: req.BucketName, Objects: []models.ObjectMeta{req}})
+		} else if err := dbInstance.Model(&bucket).Association("Objects").Append(&req).Error; err != nil {
+			return http.StatusInternalServerError, []byte("Internal Server Error")
+		}
+	} else {
+		var objectMeta models.ObjectMeta
+		result := dbInstance.Where("object_id = ?", req.ObjectID).First(&objectMeta)
+		var err error
+		if result.RowsAffected == 0 {
+			err = dbInstance.Create(&req).Error
+		} else {
+			err = dbInstance.Model(&objectMeta).Association("Fragments").Replace(req.Fragments).Error
+		}
+		if err != nil {
+			log.Errorln(err.Error())
+			return http.StatusInternalServerError, []byte("Internal Server Error")
+		}
 	}
 
 	return http.StatusOK, nil
