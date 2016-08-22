@@ -34,23 +34,22 @@ func PutObjectInfoHandler(ctx *macaron.Context, req models.ObjectMeta, log *logr
 
 	for i := range req.Fragments {
 		req.Fragments[i].FragmentID = utils.MD5ID()
+		req.Fragments[i].ObjectMetaID = req.ObjectID
 	}
 
-	// Find the record in db
 	dbInstance := db.SQLDB.GetDB().(*gorm.DB)
-	var objectMeta models.ObjectMeta
-	dbInstance.Where("id = ?", req.ID).First(&objectMeta)
 
-	var err error
-	if &objectMeta == nil || objectMeta.ID == "" { // Create new record
-		err = db.SQLDB.Create(&req)
-	} else { // Update the objectMeta
-		err = dbInstance.Model(&objectMeta).Association("Fragments").Replace(req.Fragments).Error
+	var bucket models.Bucket
+	result := dbInstance.Where("name = ?", req.BucketName).First(&bucket)
+	if result.Error != nil {
+		// TODO If error == "record not found", shall we create the bucket or report an error
+		// log.Errorln(result.Error.Error())
+		// return http.StatusInternalServerError, []byte("Internal Server Error")
 	}
-
-	if err != nil {
-		log.Errorln(err.Error())
-		return http.StatusInternalServerError, nil
+	if result.RowsAffected == 0 {
+		dbInstance.Create(&models.Bucket{Name: req.BucketName, Objects: []models.ObjectMeta{req}})
+	} else if err := dbInstance.Model(&bucket).Association("Objects").Append(&req).Error; err != nil {
+		return http.StatusInternalServerError, []byte("Internal Server Error")
 	}
 
 	return http.StatusOK, nil
